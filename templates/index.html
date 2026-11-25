@@ -1,0 +1,420 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col-md-6 d-flex align-items-center gap-3">
+        <a href="{{ url_for('index', month=data.prev_month) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-chevron-left"></i>
+        </a>
+        <h2 class="h3 mb-0 fw-bold">{{ data.month_str | month_name }}</h2>
+        <a href="{{ url_for('index', month=data.next_month) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-chevron-right"></i>
+        </a>
+    </div>
+    <div class="col-md-6 text-md-end mt-3 mt-md-0 d-flex justify-content-md-end gap-2">
+        <form method="GET" action="{{ url_for('index') }}" class="d-inline-flex gap-2">
+            <input type="month" name="month" class="form-control" value="{{ data.month_str }}" onchange="this.form.submit()">
+        </form>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoItem">
+            <i class="bi bi-plus-circle me-1"></i> Nova Despesa / Receita
+        </button>
+    </div>
+</div>
+
+<!-- Cards de Resumo do Mês -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card stat-card bg-white p-3 border-start border-4 border-success">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-muted small text-uppercase fw-semibold">Total de Receitas</span>
+                    <h3 class="fw-bold mb-0 text-success">{{ data.total_receitas | currency }}</h3>
+                    <small class="text-muted">Realizado: {{ data.total_receitas_pagas | currency }}</small>
+                </div>
+                <div class="p-3 bg-success-subtle rounded-circle text-success fs-4">
+                    <i class="bi bi-arrow-up-circle"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card bg-white p-3 border-start border-4 border-danger">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-muted small text-uppercase fw-semibold">Total de Despesas</span>
+                    <h3 class="fw-bold mb-0 text-danger">{{ data.total_despesas | currency }}</h3>
+                    <small class="text-muted">Já Pago: {{ data.total_despesas_pagas | currency }}</small>
+                </div>
+                <div class="p-3 bg-danger-subtle rounded-circle text-danger fs-4">
+                    <i class="bi bi-arrow-down-circle"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card bg-white p-3 border-start border-4 {% if data.saldo >= 0 %}border-primary{% else %}border-warning{% endif %}">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-muted small text-uppercase fw-semibold">Saldo Previsto do Mês</span>
+                    <h3 class="fw-bold mb-0 {% if data.saldo >= 0 %}text-primary{% else %}text-danger{% endif %}">{{ data.saldo | currency }}</h3>
+                    <small class="text-muted">Saldo Efetivado: {{ data.saldo_realizado | currency }}</small>
+                </div>
+                <div class="p-3 {% if data.saldo >= 0 %}bg-primary-subtle text-primary{% else %}bg-danger-subtle text-danger{% endif %} rounded-circle fs-4">
+                    <i class="bi bi-piggy-bank"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Planilha / Tabelas -->
+<div class="row g-4">
+    <!-- Receitas -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center py-3">
+                <span class="text-success fw-bold"><i class="bi bi-arrow-down-left-circle me-1"></i> Receitas de {{ data.month_str | month_name }}</span>
+                <span class="badge bg-success-subtle text-success border border-success">{{ data.receitas | length }} itens</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table align-middle table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 45px;">Status</th>
+                            <th>Descrição</th>
+                            <th>Tipo / Duração</th>
+                            <th class="text-end">Valor</th>
+                            <th class="text-end" style="width: 80px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in data.receitas %}
+                        <tr class="{% if item.is_paid %}paid-row{% endif %}">
+                            <td>
+                                <form method="POST" action="{{ url_for('toggle_paid') }}">
+                                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                                    <input type="hidden" name="month_str" value="{{ data.month_str }}">
+                                    <input type="hidden" name="is_avulso" value="{{ 'true' if item.is_avulso else 'false' }}">
+                                    <button type="submit" class="btn btn-sm p-0 border-0 text-success" title="Alternar status de recebimento">
+                                        {% if item.is_paid %}
+                                            <i class="bi bi-check-circle-fill fs-5 text-success"></i>
+                                        {% else %}
+                                            <i class="bi bi-circle fs-5 text-muted"></i>
+                                        {% endif %}
+                                    </button>
+                                </form>
+                            </td>
+                            <td>
+                                <div class="fw-semibold {% if item.is_paid %}text-decoration-line-through text-muted{% endif %}">
+                                    {{ item.description }}
+                                </div>
+                                <span class="badge bg-light text-secondary border">{{ item.category }}</span>
+                            </td>
+                            <td>
+                                {% if item.duration_type == 'indefinido' %}
+                                    <span class="badge badge-fixo"><i class="bi bi-infinity me-1"></i>Recorrente fixo</span>
+                                {% elif item.duration_type == 'parcelado' %}
+                                    <span class="badge badge-parcela"><i class="bi bi-clock-history me-1"></i>{{ item.parcela_label }}</span>
+                                {% else %}
+                                    <span class="badge badge-avulso">{{ item.parcela_label }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end fw-bold text-success">
+                                {{ item.amount | currency }}
+                            </td>
+                            <td class="text-end" style="white-space: nowrap;">
+                                {% if not item.is_avulso %}
+                                <button type="button" class="btn btn-sm btn-outline-primary me-1" title="Editar este item"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#modalEditarItem"
+                                    data-id="{{ item.id }}"
+                                    data-desc="{{ item.description }}"
+                                    data-amount="{{ '%.2f' | format(item.amount) | replace('.', ',') }}"
+                                    data-category="{{ item.category }}"
+                                    data-type="{{ item.type }}"
+                                    data-duration="{{ item.duration_type }}">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                {% endif %}
+                                <form method="POST" action="{{ url_for('delete_month_instance') }}" class="d-inline" onsubmit="return confirm('Remover este item especificamente de {{ data.month_str }}?');">
+                                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                                    <input type="hidden" name="month_str" value="{{ data.month_str }}">
+                                    <input type="hidden" name="is_avulso" value="{{ 'true' if item.is_avulso else 'false' }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir deste mês">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                Nenhuma receita prevista para este mês.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Despesas -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center py-3">
+                <span class="text-danger fw-bold"><i class="bi bi-arrow-up-right-circle me-1"></i> Despesas de {{ data.month_str | month_name }}</span>
+                <span class="badge bg-danger-subtle text-danger border border-danger">{{ data.despesas | length }} itens</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table align-middle table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 45px;">Pago</th>
+                            <th>Descrição</th>
+                            <th>Tipo / Parcela</th>
+                            <th class="text-end">Valor</th>
+                            <th class="text-end" style="width: 80px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in data.despesas %}
+                        <tr class="{% if item.is_paid %}paid-row{% endif %}">
+                            <td>
+                                <form method="POST" action="{{ url_for('toggle_paid') }}">
+                                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                                    <input type="hidden" name="month_str" value="{{ data.month_str }}">
+                                    <input type="hidden" name="is_avulso" value="{{ 'true' if item.is_avulso else 'false' }}">
+                                    <button type="submit" class="btn btn-sm p-0 border-0" title="Alternar status de pagamento">
+                                        {% if item.is_paid %}
+                                            <i class="bi bi-check-circle-fill fs-5 text-success"></i>
+                                        {% else %}
+                                            <i class="bi bi-circle fs-5 text-muted"></i>
+                                        {% endif %}
+                                    </button>
+                                </form>
+                            </td>
+                            <td>
+                                <div class="fw-semibold {% if item.is_paid %}text-decoration-line-through text-muted{% endif %}">
+                                    {{ item.description }}
+                                </div>
+                                <span class="badge bg-light text-secondary border">{{ item.category }}</span>
+                            </td>
+                            <td>
+                                {% if item.duration_type == 'indefinido' %}
+                                    <span class="badge badge-fixo"><i class="bi bi-infinity me-1"></i>Recorrente fixo</span>
+                                {% elif item.duration_type == 'parcelado' %}
+                                    <span class="badge badge-parcela"><i class="bi bi-clock-history me-1"></i>{{ item.parcela_label }}</span>
+                                {% else %}
+                                    <span class="badge badge-avulso">{{ item.parcela_label }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end fw-bold text-danger">
+                                {{ item.amount | currency }}
+                            </td>
+                            <td class="text-end" style="white-space: nowrap;">
+                                {% if not item.is_avulso %}
+                                <button type="button" class="btn btn-sm btn-outline-primary me-1" title="Editar este item"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#modalEditarItem"
+                                    data-id="{{ item.id }}"
+                                    data-desc="{{ item.description }}"
+                                    data-amount="{{ '%.2f' | format(item.amount) | replace('.', ',') }}"
+                                    data-category="{{ item.category }}"
+                                    data-type="{{ item.type }}"
+                                    data-duration="{{ item.duration_type }}">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                {% endif %}
+                                <form method="POST" action="{{ url_for('delete_month_instance') }}" class="d-inline" onsubmit="return confirm('Remover este item especificamente de {{ data.month_str }}?');">
+                                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                                    <input type="hidden" name="month_str" value="{{ data.month_str }}">
+                                    <input type="hidden" name="is_avulso" value="{{ 'true' if item.is_avulso else 'false' }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir deste mês">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                Nenhuma despesa cadastrada para este mês.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Novo Item Recorrente / Parcelado -->
+<div class="modal fade" id="modalNovoItem" tabindex="-1" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="modalLabel"><i class="bi bi-pencil-square me-2"></i>Cadastrar Despesa / Receita</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_item') }}">
+                <input type="hidden" name="redirect_month" value="{{ data.month_str }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Tipo do Lançamento</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="type" id="typeDespesa" value="despesa" checked>
+                            <label class="btn btn-outline-danger" for="typeDespesa"><i class="bi bi-arrow-up-right me-1"></i> Despesa</label>
+
+                            <input type="radio" class="btn-check" name="type" id="typeReceita" value="receita">
+                            <label class="btn btn-outline-success" for="typeReceita"><i class="bi bi-arrow-down-left me-1"></i> Receita</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Descrição</label>
+                        <input type="text" name="description" class="form-control" placeholder="Ex: Salário, Aluguel, Parcela Celular, Netflix..." required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Valor (R$)</label>
+                            <input type="text" name="amount" class="form-control money-input" placeholder="0,00" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Categoria</label>
+                            <input type="text" name="category" class="form-control" placeholder="Moradia, Salário, Lazer..." value="Geral">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">A partir de qual mês?</label>
+                            <input type="month" name="start_month" class="form-control" value="{{ data.month_str }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Tipo de Duração</label>
+                            <select name="duration_type" id="durationTypeSelect" class="form-select" onchange="toggleInstallments(this.value)">
+                                <option value="indefinido">Para sempre (Recorrente todo mês)</option>
+                                <option value="parcelado">Parcelado (com prazo limite)</option>
+                                <option value="unico">Apenas neste mês (Único)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" id="installmentsBox" style="display: none;">
+                        <label class="form-label fw-semibold">Número de Parcelas (Meses)</label>
+                        <input type="number" name="installments_count" id="installmentsInput" class="form-control" min="2" max="360" placeholder="Ex: 10 (para 10 parcelas mensais)">
+                        <small class="text-muted">O sistema irá repassar automaticamente até completar todas as parcelas.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Lançamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar Item -->
+<div class="modal fade" id="modalEditarItem" tabindex="-1" aria-labelledby="modalEditLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="modalEditLabel"><i class="bi bi-pencil-square me-2"></i>Editar Lançamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('edit_item') }}">
+                <input type="hidden" name="item_id" id="editItemId">
+                <input type="hidden" name="month_str" value="{{ data.month_str }}">
+                <input type="hidden" name="redirect_month" value="{{ data.month_str }}">
+                
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Onde aplicar a alteração?</label>
+                        <div class="form-check p-2 rounded border bg-light mb-2">
+                            <input class="form-check-input ms-1" type="radio" name="scope" id="scopeAll" value="permanent" checked>
+                            <label class="form-check-label ms-2 fw-semibold" for="scopeAll">
+                                <i class="bi bi-globe me-1 text-primary"></i> Em todos os meses (Permanente)
+                                <div class="text-muted small fw-normal">Atualiza o cadastro base (descrição, categoria e valor para todos os meses).</div>
+                            </label>
+                        </div>
+                        <div class="form-check p-2 rounded border bg-light">
+                            <input class="form-check-input ms-1" type="radio" name="scope" id="scopeMonthOnly" value="month_only">
+                            <label class="form-check-label ms-2 fw-semibold" for="scopeMonthOnly">
+                                <i class="bi bi-calendar-event me-1 text-warning"></i> Apenas em {{ data.month_str | month_name }}
+                                <div class="text-muted small fw-normal">Altera o valor apenas neste mês específico, sem mudar os outros meses.</div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Descrição</label>
+                        <input type="text" name="description" id="editDescription" class="form-control" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Valor (R$)</label>
+                            <input type="text" name="amount" id="editAmount" class="form-control money-input" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Categoria</label>
+                            <input type="text" name="category" id="editCategory" class="form-control" value="Geral">
+                        </div>
+                    </div>
+
+                    <div class="mb-3" id="editTypeBox">
+                        <label class="form-label fw-semibold">Tipo</label>
+                        <select name="type" id="editType" class="form-select">
+                            <option value="despesa">Despesa</option>
+                            <option value="receita">Receita</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleInstallments(value) {
+        const box = document.getElementById('installmentsBox');
+        const input = document.getElementById('installmentsInput');
+        if (value === 'parcelado') {
+            box.style.display = 'block';
+            input.setAttribute('required', 'required');
+            if (!input.value) input.value = 12;
+        } else {
+            box.style.display = 'none';
+            input.removeAttribute('required');
+        }
+    }
+
+    // Preenchimento dinâmico do modal de edição
+    const modalEditarItem = document.getElementById('modalEditarItem');
+    if (modalEditarItem) {
+        modalEditarItem.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const id = button.getAttribute('data-id');
+            const desc = button.getAttribute('data-desc');
+            const amount = button.getAttribute('data-amount');
+            const category = button.getAttribute('data-category');
+            const type = button.getAttribute('data-type');
+
+            document.getElementById('editItemId').value = id;
+            document.getElementById('editDescription').value = desc;
+            document.getElementById('editAmount').value = amount;
+            document.getElementById('editCategory').value = category;
+            document.getElementById('editType').value = type;
+            document.getElementById('scopeAll').checked = true;
+        });
+    }
+</script>
+{% endblock %}

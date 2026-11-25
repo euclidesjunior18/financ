@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col-md-8">
+        <h2 class="h3 mb-1 fw-bold">Gerenciador de Recorrências & Contratos</h2>
+        <p class="text-muted mb-0">Aqui você visualiza todas as regras que alimentam as planilhas dos meses futuros.</p>
+    </div>
+    <div class="col-md-4 text-md-end mt-3 mt-md-0">
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Voltar à Planilha Mensal
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header py-3">
+        <span class="fw-bold"><i class="bi bi-list-check me-2"></i>Todos os Itens Recorrentes e Parcelados Ativos</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Descrição</th>
+                    <th>Categoria</th>
+                    <th>Mês Inicial</th>
+                    <th>Regra de Repasse</th>
+                    <th class="text-end">Valor Mensal</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>
+                        {% if item.type == 'receita' %}
+                            <span class="badge bg-success-subtle text-success border border-success"><i class="bi bi-arrow-down-left"></i> Receita</span>
+                        {% else %}
+                            <span class="badge bg-danger-subtle text-danger border border-danger"><i class="bi bi-arrow-up-right"></i> Despesa</span>
+                        {% endif %}
+                    </td>
+                    <td class="fw-semibold">{{ item.description }}</td>
+                    <td><span class="badge bg-light text-secondary border">{{ item.category }}</span></td>
+                    <td>{{ item.start_month | month_name }}</td>
+                    <td>
+                        {% if item.duration_type == 'indefinido' %}
+                            <span class="badge badge-fixo"><i class="bi bi-infinity me-1"></i>Para sempre (Recorrente)</span>
+                        {% elif item.duration_type == 'parcelado' %}
+                            <span class="badge badge-parcela"><i class="bi bi-clock-history me-1"></i>{{ item.installments_count }} parcelas mensais</span>
+                        {% else %}
+                            <span class="badge badge-avulso">Mês único</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end fw-bold {% if item.type == 'receita' %}text-success{% else %}text-danger{% endif %}">
+                        {{ item.amount | currency }}
+                    </td>
+                    <td class="text-end" style="white-space: nowrap;">
+                        <button type="button" class="btn btn-sm btn-outline-primary me-1" title="Editar regra"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalEditarRegra"
+                            data-id="{{ item.id }}"
+                            data-desc="{{ item.description }}"
+                            data-amount="{{ '%.2f' | format(item.amount) | replace('.', ',') }}"
+                            data-category="{{ item.category }}"
+                            data-type="{{ item.type }}"
+                            data-duration="{{ item.duration_type }}"
+                            data-installments="{{ item.installments_count or '' }}">
+                            <i class="bi bi-pencil me-1"></i> Editar
+                        </button>
+                        <form method="POST" action="{{ url_for('delete_permanent', item_id=item.id) }}" onsubmit="return confirm('ATENÇÃO: Isso excluirá esta despesa/receita de TODOS os meses permanentemente! Deseja continuar?');" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir regra de todos os meses">
+                                <i class="bi bi-trash me-1"></i> Excluir
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-5 text-muted">
+                        Nenhum item recorrente cadastrado no momento.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Editar Regra (Cadastros) -->
+<div class="modal fade" id="modalEditarRegra" tabindex="-1" aria-labelledby="modalRegraLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="modalRegraLabel"><i class="bi bi-pencil-square me-2"></i>Editar Regra Recorrente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('edit_item') }}">
+                <input type="hidden" name="item_id" id="cadEditItemId">
+                <input type="hidden" name="scope" value="permanent">
+                
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Tipo</label>
+                        <select name="type" id="cadEditType" class="form-select">
+                            <option value="despesa">Despesa</option>
+                            <option value="receita">Receita</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Descrição</label>
+                        <input type="text" name="description" id="cadEditDescription" class="form-control" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Valor Mensal (R$)</label>
+                            <input type="text" name="amount" id="cadEditAmount" class="form-control money-input" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Categoria</label>
+                            <input type="text" name="category" id="cadEditCategory" class="form-control" value="Geral">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Duração</label>
+                            <select name="duration_type" id="cadEditDurationType" class="form-select" onchange="toggleCadInstallments(this.value)">
+                                <option value="indefinido">Para sempre (Recorrente)</option>
+                                <option value="parcelado">Parcelado</option>
+                                <option value="unico">Mês único</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3" id="cadInstallmentsBox" style="display: none;">
+                            <label class="form-label fw-semibold">Nº de Parcelas</label>
+                            <input type="number" name="installments_count" id="cadEditInstallments" class="form-control" min="2" max="360">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleCadInstallments(value) {
+        const box = document.getElementById('cadInstallmentsBox');
+        if (value === 'parcelado') {
+            box.style.display = 'block';
+        } else {
+            box.style.display = 'none';
+        }
+    }
+
+    const modalEditarRegra = document.getElementById('modalEditarRegra');
+    if (modalEditarRegra) {
+        modalEditarRegra.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const id = button.getAttribute('data-id');
+            const desc = button.getAttribute('data-desc');
+            const amount = button.getAttribute('data-amount');
+            const category = button.getAttribute('data-category');
+            const type = button.getAttribute('data-type');
+            const duration = button.getAttribute('data-duration');
+            const installments = button.getAttribute('data-installments');
+
+            document.getElementById('cadEditItemId').value = id;
+            document.getElementById('cadEditDescription').value = desc;
+            document.getElementById('cadEditAmount').value = amount;
+            document.getElementById('cadEditCategory').value = category;
+            document.getElementById('cadEditType').value = type;
+            document.getElementById('cadEditDurationType').value = duration;
+            document.getElementById('cadEditInstallments').value = installments || '';
+
+            toggleCadInstallments(duration);
+        });
+    }
+</script>
+{% endblock %}

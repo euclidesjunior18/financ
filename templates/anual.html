@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col-md-6 d-flex align-items-center gap-3">
+        <a href="{{ url_for('anual', year=prev_year) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-chevron-left"></i>
+        </a>
+        <h2 class="h3 mb-0 fw-bold">Planilha Anual Projetada - {{ year }}</h2>
+        <a href="{{ url_for('anual', year=next_year) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-chevron-right"></i>
+        </a>
+    </div>
+    <div class="col-md-6 text-md-end mt-3 mt-md-0">
+        <span class="text-muted small">Visualização completa de como os dados e parcelas são repassados ao longo dos meses.</span>
+    </div>
+</div>
+
+<!-- Cards Totais do Ano -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card stat-card bg-white p-3 border-start border-4 border-success">
+            <span class="text-muted small text-uppercase fw-semibold">Receitas Totais em {{ year }}</span>
+            <h3 class="fw-bold mb-0 text-success">{{ total_anual_receita | currency }}</h3>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card bg-white p-3 border-start border-4 border-danger">
+            <span class="text-muted small text-uppercase fw-semibold">Despesas Totais em {{ year }}</span>
+            <h3 class="fw-bold mb-0 text-danger">{{ total_anual_despesa | currency }}</h3>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card bg-white p-3 border-start border-4 {% if total_anual_saldo >= 0 %}border-primary{% else %}border-warning{% endif %}">
+            <span class="text-muted small text-uppercase fw-semibold">Balanço / Saldo do Ano</span>
+            <h3 class="fw-bold mb-0 {% if total_anual_saldo >= 0 %}text-primary{% else %}text-danger{% endif %}">{{ total_anual_saldo | currency }}</h3>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela Estilo Planilha -->
+<div class="card">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <span class="fw-bold"><i class="bi bi-table me-2"></i>Evolução Mês a Mês</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 text-center">
+            <thead>
+                <tr>
+                    <th class="text-start">Mês</th>
+                    <th class="text-end">Receitas Previstas</th>
+                    <th class="text-end">Despesas Previstas</th>
+                    <th class="text-end">Saldo Previsto</th>
+                    <th style="width: 130px;">Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in summary %}
+                <tr>
+                    <td class="text-start fw-semibold">
+                        <i class="bi bi-calendar-event me-2 text-primary"></i>
+                        {{ item.month | month_name }}
+                    </td>
+                    <td class="text-end text-success fw-bold">
+                        {{ item.receitas | currency }}
+                    </td>
+                    <td class="text-end text-danger fw-bold">
+                        {{ item.despesas | currency }}
+                    </td>
+                    <td class="text-end fw-bold {% if item.saldo >= 0 %}text-primary{% else %}text-danger{% endif %}">
+                        {{ item.saldo | currency }}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('index', month=item.month) }}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-box-arrow-in-right me-1"></i> Abrir Mês
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="table-light fw-bold">
+                <tr>
+                    <td class="text-start">TOTAL DO ANO</td>
+                    <td class="text-end text-success">{{ total_anual_receita | currency }}</td>
+                    <td class="text-end text-danger">{{ total_anual_despesa | currency }}</td>
+                    <td class="text-end {% if total_anual_saldo >= 0 %}text-primary{% else %}text-danger{% endif %}">{{ total_anual_saldo | currency }}</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% endblock %}
